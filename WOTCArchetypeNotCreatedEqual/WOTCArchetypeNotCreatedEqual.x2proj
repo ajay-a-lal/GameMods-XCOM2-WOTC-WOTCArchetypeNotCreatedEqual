@@ -1,0 +1,39 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Default" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Guid>1a12c8b0-2c42-4c91-8134-f949c66a2393</Guid>
+    <Name>WOTCArchetypeNotCreatedEqual</Name>
+    <Description>WOTCArchetypeNotCreatedEqual attempts to have the fairness and RNG of the
+WOTC Points Based not created Equal with the addition of balancing for class
+Archetypes within the RNG cycle</Description>
+    <SteamPublishID>0</SteamPublishID>
+    <AssemblyName>WOTCArchetypeNotCreatedEqual</AssemblyName>
+    <RootNamespace>WOTCArchetypeNotCreatedEqual</RootNamespace>
+    <ProjectGuid>{6148d659-854b-483d-8921-578a6e67c587}</ProjectGuid>
+  </PropertyGroup>
+  <ItemGroup>
+    <Folder Include="Config\" />
+    <Folder Include="Localization\" />
+    <Folder Include="Src\" />
+    <Folder Include="Src\WOTCArchetypeNotCreatedEqual\" />
+    <Folder Include="Src\WOTCArchetypeNotCreatedEqual\Classes\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Config\XComATNCE.ini" />
+    <Content Include="Config\XComEditor.ini" />
+    <Content Include="Config\XComEngine.ini" />
+    <Content Include="Config\XComGame.ini" />
+    <Content Include="Localization\WOTCArchetypeNotCreatedEqual.int" />
+    <Content Include="ModPreview.jpg" />
+    <Content Include="ReadMe.txt" />
+    <Content Include="Src\WOTCArchetypeNotCreatedEqual\Classes\X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual.uc" />
+    <Content Include="Src\WOTCArchetypeNotCreatedEqual\Classes\X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_TierResolver.uc" />
+    <Content Include="Src\WOTCArchetypeNotCreatedEqual\Classes\X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_Utils.uc" />
+  </ItemGroup>
+  <PropertyGroup>
+    <SolutionRoot>$(MSBuildProjectDirectory)\..\</SolutionRoot>
+    <ScriptsDir>$(SolutionRoot).scripts\</ScriptsDir>
+    <BuildCommonRoot>$(ScriptsDir)X2ModBuildCommon\</BuildCommonRoot>
+  </PropertyGroup>
+  <Import Project="$(BuildCommonRoot)XCOM2.targets" />
+</Project>
