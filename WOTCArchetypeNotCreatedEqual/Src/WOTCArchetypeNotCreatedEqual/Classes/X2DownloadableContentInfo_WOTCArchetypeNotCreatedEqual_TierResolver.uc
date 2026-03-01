@@ -8,7 +8,6 @@ class X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_TierResolver extend
 /// Function: ATNCE_ResolveStatValueByTierWeight
 /// Purpose: Resolves a stat value based on selected tier weighting and tier range configurations.
 /// Params:
-///   config - The stat configuration containing tier weights and stat type
 ///   tierRanges - The tier range definitions (min/max values for each tier)
 ///   minRefineTier - The minimum tier that should be refined (prevents lower tiers from being selected)
 ///   statStateDetails - Internal soldier stat state and archetype information
@@ -16,7 +15,6 @@ class X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_TierResolver extend
 ///   selectedTier - Output parameter containing the selected tier type
 /// Returns: The resolved stat value based on the selected tier's range
 static function int ATNCE_ResolveStatValueByTierWeight(
-	ATNCE_StatConfig config, 
 	ATNCE_TierRanges tierRanges,
     ATNCE_TierType selectedTier,
 	bool enableLogging)
@@ -56,7 +54,7 @@ static function int ATNCE_ResolveStatValueByTierWeight(
 ///   statStateDetails - Internal soldier stat state and archetype information
 /// Returns: The selected tier type (ATNCE_TierA, B, C, or D)
 static function ATNCE_TierType ATNCE_SelectTierByWeighting(
-	ATNCE_StatConfig config,
+	ATNCE_StatConfig statConfig,
 	ATNCE_SelectTierRanges selectTierRanges, 
 	ATNCE_SoldierDetail statStateDetails)
 {
@@ -68,10 +66,10 @@ static function ATNCE_TierType ATNCE_SelectTierByWeighting(
 
     `LOG("The Select Tier Ranges are: Min" @ selectTierRanges.minSelectTier @ "to" @ selectTierRanges.maxSelectTier, coreConfig.ATNCE_EnableLogging, 'WOTCArchetype_ATNCE');
 
-    setWeightD = config.TierWeights.WeightD;
-    setWeightC = config.TierWeights.WeightC;
-    setWeightB = config.TierWeights.WeightB;
-    setWeightA = config.TierWeights.WeightA;
+    setWeightD = statConfig.TierWeights.WeightD;
+    setWeightC = statConfig.TierWeights.WeightC;
+    setWeightB = statConfig.TierWeights.WeightB;
+    setWeightA = statConfig.TierWeights.WeightA;
 
     if (selectTierRanges.minSelectTier > ATNCE_TierD || selectTierRanges.maxSelectTier < ATNCE_TierD) setWeightD = 0;
     if (selectTierRanges.minSelectTier > ATNCE_TierC || selectTierRanges.maxSelectTier < ATNCE_TierC) setWeightC = 0;
@@ -82,12 +80,12 @@ static function ATNCE_TierType ATNCE_SelectTierByWeighting(
 
     if (statStateDetails.SelectedArchetypeIndex >= 0)
     {
-        if (config.CharStatType == statStateDetails.ArchetypeStatConfig.primaryCharStatType)
+        if (statConfig.CharStatType == statStateDetails.ArchetypeStatConfig.primaryCharStatType)
         {
             setWeightD = 0; 
             setWeightC = 0;
         }
-        else if (config.CharStatType == statStateDetails.ArchetypeStatConfig.secondaryCharStatType)
+        else if (statConfig.CharStatType == statStateDetails.ArchetypeStatConfig.secondaryCharStatType)
         {
             setWeightD = 0;
         }
@@ -132,7 +130,7 @@ static function ATNCE_TierType ATNCE_SelectTierByWeighting(
 /// Params:
 ///   config - The stat configuration containing base stat ranges and tier parameters
 /// Returns: ATNCE_TierRanges structure with min/max values for tiers D, C, B, and A
-static function ATNCE_TierRanges ATNCE_GenerateTierRangesByArchetype(const ATNCE_StatConfig config)
+static function ATNCE_TierRanges ATNCE_GenerateTierRangesByArchetype(const ATNCE_StatConfig statConfig)
 {
 	local ATNCE_TierRanges returnTierRanges;
     local float midLow, midHigh;
@@ -150,17 +148,17 @@ static function ATNCE_TierRanges ATNCE_GenerateTierRangesByArchetype(const ATNCE
     useShifts[1] = coreConfig.ATNCE_TierMaxOverlaps.CtoBPercent / 100.0f;
     useShifts[2] = coreConfig.ATNCE_TierMaxOverlaps.BtoAPercent / 100.0f;
 
-    midLow = (config.StatRanges.RangeLow + config.StatRanges.RangeMid) / 2.0f;
-    midHigh = (config.StatRanges.RangeMid + config.StatRanges.RangeHigh) / 2.0f;
+    midLow = (statConfig.StatRanges.RangeLow + statConfig.StatRanges.RangeMid) / 2.0f;
+    midHigh = (statConfig.StatRanges.RangeMid + statConfig.StatRanges.RangeHigh) / 2.0f;
 
-    baseMins[0] = config.StatRanges.RangeLow;
+    baseMins[0] = statConfig.StatRanges.RangeLow;
     baseMaxs[0] = midLow;
     baseMins[1] = midLow;
-    baseMaxs[1] = config.StatRanges.RangeMid;
-    baseMins[2] = config.StatRanges.RangeMid;
+    baseMaxs[1] = statConfig.StatRanges.RangeMid;
+    baseMins[2] = statConfig.StatRanges.RangeMid;
     baseMaxs[2] = midHigh;
     baseMins[3] = midHigh;
-    baseMaxs[3] = config.StatRanges.RangeHigh;
+    baseMaxs[3] = statConfig.StatRanges.RangeHigh;
 
     for (tier = 0; tier < 4; tier++)
     {
@@ -177,13 +175,13 @@ static function ATNCE_TierRanges ATNCE_GenerateTierRangesByArchetype(const ATNCE
         outMins[tier] = Round(baseMins[tier]);
         outMaxs[tier] = Round(baseMaxs[tier]);
 
-		if (outMins[tier] < config.StatRanges.RangeLow)
+		if (outMins[tier] < statConfig.StatRanges.RangeLow)
 		{
-			outMins[tier] = config.StatRanges.RangeLow;
+			outMins[tier] = statConfig.StatRanges.RangeLow;
 		}
     }
 
-	bIsNarrowLowerHalf = (config.StatRanges.RangeMid - config.StatRanges.RangeLow) <= 5;
+	bIsNarrowLowerHalf = (statConfig.StatRanges.RangeMid - statConfig.StatRanges.RangeLow) <= 5;
 
 	if (bIsNarrowLowerHalf)
 	{
@@ -221,9 +219,9 @@ static function ATNCE_TierRanges ATNCE_GenerateTierRangesByArchetype(const ATNCE
     returnTierRanges.TierALow = outMins[3];
     returnTierRanges.TierAHigh = outMaxs[3];
 
-	if (returnTierRanges.TierAHigh > config.StatRanges.RangeHigh)
+	if (returnTierRanges.TierAHigh > statConfig.StatRanges.RangeHigh)
 	{
-		returnTierRanges.TierAHigh = config.StatRanges.RangeHigh;
+		returnTierRanges.TierAHigh = statConfig.StatRanges.RangeHigh;
 	}
 
 	return returnTierRanges;
@@ -247,6 +245,8 @@ static function int ATNCE_CalculateMaxHighTierStatsAllowed()
     maxResult = 3;
 
     if(arrayLen < 7) return minResult;
+
+    if(arrayLen == 7) return maxResult;
 
     if(arrayLen >= 10)
     {

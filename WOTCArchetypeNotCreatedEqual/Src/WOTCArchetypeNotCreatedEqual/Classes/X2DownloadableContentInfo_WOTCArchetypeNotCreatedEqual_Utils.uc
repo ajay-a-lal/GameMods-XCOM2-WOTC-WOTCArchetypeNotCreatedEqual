@@ -46,7 +46,7 @@ static function ATNCE_TestGenerateSoldierStats()
 static function bool ATNCE_IsConfigurationValid(bool enableErrorLogOverride)
 {
     local int i;
-    local ATNCE_StatConfig config;
+    local ATNCE_StatConfig statConfig;
     local ATNCE_CoreConfig coreConfig;
     local int primaryStatCount;
 	local bool enableLogging;
@@ -63,14 +63,14 @@ static function bool ATNCE_IsConfigurationValid(bool enableErrorLogOverride)
 
     for (i = 0; i < coreConfig.ATNCE_StatTierWeights.Length; ++i)
     {
-        config = coreConfig.ATNCE_StatTierWeights[i];
-        if (config.CharStatType == eStat_Invalid)
+        statConfig = coreConfig.ATNCE_StatTierWeights[i];
+        if (statConfig.CharStatType == eStat_Invalid)
         {
             `LOG("[ERROR] StatTierWeights[" @ i @ "] has eStat_Invalid", enableLogging, 'WOTCArchetype_ATNCE');
             return false;
         }
 
-        if (config.StatGroupType == ATNCE_Primary) primaryStatCount++;
+        if (statConfig.StatGroupType == ATNCE_Primary) primaryStatCount++;
     }
 
     if (primaryStatCount < 2) 

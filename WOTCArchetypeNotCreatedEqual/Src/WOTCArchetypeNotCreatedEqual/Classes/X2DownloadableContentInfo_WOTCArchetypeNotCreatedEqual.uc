@@ -381,7 +381,7 @@ function ATNCE_OnStatAssignmentCompleteFn(XComGameState_Unit unit)
 /// Returns: Array of ATNCE_SoldierStat containing generated stats for all configured stat types
 static function ATNCE_SoldierDetail ATNCE_GenerateSoldier(bool enableLogging)
 {
-	local ATNCE_StatConfig config;
+	local ATNCE_StatConfig statConfig;
 	local int selectedArchetypeIndex;
 	local int i;
 	local ATNCE_TierRanges tierRanges;
@@ -445,17 +445,17 @@ static function ATNCE_SoldierDetail ATNCE_GenerateSoldier(bool enableLogging)
 
 	for (i = 0; i < orderedArcheConfigs.Length; ++i)
 	{
-		config = orderedArcheConfigs[i];
+		statConfig = orderedArcheConfigs[i];
 
-		`LOG("    Stat" @ Config.CharStatType @ "-> D/C/B/A weights:" 
-		     @ Config.TierWeights.WeightD @ Config.TierWeights.WeightC 
-		     @ Config.TierWeights.WeightB @ Config.TierWeights.WeightA, 
+		`LOG("    Stat" @ statConfig.CharStatType @ "-> D/C/B/A weights:" 
+		     @ statConfig.TierWeights.WeightD @ statConfig.TierWeights.WeightC 
+		     @ statConfig.TierWeights.WeightB @ statConfig.TierWeights.WeightA, 
 		     enableLogging, 'WOTCArchetype_ATNCE');
 			 
 		tierRanges = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_TierResolver'
-		.static.ATNCE_GenerateTierRangesByArchetype(config);
+		.static.ATNCE_GenerateTierRangesByArchetype(statConfig);
 
-        `LOG("    Ranges for " @ Config.CharStatType 
+        `LOG("    Ranges for " @ statConfig.CharStatType 
              @ " D: " @ TierRanges.TierDLow @ "-" @ TierRanges.TierDHigh 
              @ " C: " @ TierRanges.TierCLow @ "-" @ TierRanges.TierCHigh 
              @ " B: " @ TierRanges.TierBLow @ "-" @ TierRanges.TierBHigh 
@@ -463,30 +463,30 @@ static function ATNCE_SoldierDetail ATNCE_GenerateSoldier(bool enableLogging)
 			 enableLogging, 'WOTCArchetype_ATNCE');
 
 		selectedTier = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_TierResolver'
-		.static.ATNCE_SelectTierByWeighting(config, selectTierRanges, soldierDetail);
+		.static.ATNCE_SelectTierByWeighting(statConfig, selectTierRanges, soldierDetail);
 		
-		`LOG("    Stat" @ Config.CharStatType @ "selected band:" @ SelectedTier, enableLogging, 'WOTCArchetype_ATNCE');
+		`LOG("    Stat" @ statConfig.CharStatType @ "selected band:" @ SelectedTier, enableLogging, 'WOTCArchetype_ATNCE');
 
 		setStatValue = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_TierResolver'
-		.static.ATNCE_ResolveStatValueByTierWeight(config, tierRanges, selectedTier, enableLogging);
+		.static.ATNCE_ResolveStatValueByTierWeight(tierRanges, selectedTier, enableLogging);
 
-		`LOG("    Stat" @ Config.CharStatType @ "selected value:" @ SetStatValue, enableLogging, 'WOTCArchetype_ATNCE');
+		`LOG("    Stat" @ statConfig.CharStatType @ "selected value:" @ SetStatValue, enableLogging, 'WOTCArchetype_ATNCE');
 
-		soldierStat.CharStatType = config.CharStatType;
+		soldierStat.CharStatType = statConfig.CharStatType;
         soldierStat.StatValue = setStatValue;
-		soldierStat.StatGroupType = config.StatGroupType;
+		soldierStat.StatGroupType = statConfig.StatGroupType;
 		soldierStat.Tier = selectedTier;
 		soldierStat.TierRanges = tierRanges;
 		soldierStat.StatMessage = "Normal";
 
 		if (selectedArchetypeIndex >= 0)
 		{
-			if (config.CharStatType == soldierDetail.ArchetypeStatConfig.primaryCharStatType)
+			if (statConfig.CharStatType == soldierDetail.ArchetypeStatConfig.primaryCharStatType)
 			{
 				soldierStat.isArchetypeStat = true;
 				soldierStat.StatMessage = "AT Primary";
 			}
-			else if (config.CharStatType == soldierDetail.ArchetypeStatConfig.secondaryCharStatType)
+			else if (statConfig.CharStatType == soldierDetail.ArchetypeStatConfig.secondaryCharStatType)
 			{
 				soldierStat.isArchetypeStat = true;
 				soldierStat.StatMessage = "AT Secondary";
@@ -512,79 +512,104 @@ static function ATNCE_SoldierDetail ATNCE_GenerateSoldier(bool enableLogging)
 /// Returns: Array of refined ATNCE_SoldierStat
 static function array<ATNCE_SoldierStat> ATNCE_RefineSoldierStats(ATNCE_SoldierDetail soldierDetail, bool enableLogging)
 {
-	local int countPrimaryLowTiers;
-	local int countAllLowTiers;
-	local int numberOfPrimaryStats;
-	local array<int> primaryStatIndexes;
-	local int randomPrimaryIndex;
-	local ATNCE_SoldierStat selectedPrimaryStat;
-	local int i;
-	local int refinedStatValue;
-	local array<ATNCE_SoldierStat> returnRefinedSoldierStats;
-	local ATNCE_StatConfig archetypeConfig;
-	local ATNCE_TierType selectedTier;
-	local ATNCE_SelectTierRanges selectTierRanges;
+    local int countPrimaryLowTiers;
+    local array<int> primaryStatIndexes;
+    local array<int> nonPrimaryStatIndexes;
+    local int randomRefineIndex, targetIdx;
+    local ATNCE_SoldierStat selectedRefinedStat;
+	local ATNCE_StatConfig statConfig;
+    local int i;
+    local int refinedStatValue;
+    local array<ATNCE_SoldierStat> returnRefinedSoldierStats;
+    local ATNCE_TierType selectedTier;
+    local ATNCE_SelectTierRanges selectTierRanges;
+    local int currentHighTierStatsCount;
 
-	for (i = 0; i < soldierDetail.soldierStats.Length; ++i)
-	{
-		if (soldierDetail.soldierStats[i].StatGroupType == ATNCE_Primary)
-		{
-			numberOfPrimaryStats++;
-			
-			primaryStatIndexes.AddItem(i);
-			if (soldierDetail.soldierStats[i].Tier == ATNCE_TierD)
-			{
-				countPrimaryLowTiers++;
-			}
-		}
+    currentHighTierStatsCount = soldierDetail.HighTierStatsCount;
 
-		if (soldierDetail.soldierStats[i].Tier == ATNCE_TierD)
-		{
-			countAllLowTiers++;
-		}
+    for (i = 0; i < soldierDetail.soldierStats.Length; ++i)
+    {
+        returnRefinedSoldierStats.AddItem(soldierDetail.soldierStats[i]);
 
-		returnRefinedSoldierStats.AddItem(soldierDetail.soldierStats[i]);
-	}
+        if (soldierDetail.soldierStats[i].StatGroupType == ATNCE_Primary)
+        {
+            primaryStatIndexes.AddItem(i);
+            if (soldierDetail.soldierStats[i].Tier == ATNCE_TierD)
+            {
+                countPrimaryLowTiers++;
+            }
+        }
+        else if(soldierDetail.soldierStats[i].Tier == ATNCE_TierD)
+        {
+            nonPrimaryStatIndexes.AddItem(i);
+        }
+    }
 
-	if (numberOfPrimaryStats > 0 && (countPrimaryLowTiers == numberOfPrimaryStats || countAllLowTiers == soldierDetail.soldierStats.Length))
-	{
-		randomPrimaryIndex = `SYNC_RAND_STATIC(numberOfPrimaryStats);
-		selectedPrimaryStat = returnRefinedSoldierStats[primaryStatIndexes[randomPrimaryIndex]];
+	// Primary Refine
+    if (primaryStatIndexes.Length > 0 && (countPrimaryLowTiers == primaryStatIndexes.Length))
+    {
+        randomRefineIndex = `SYNC_RAND_STATIC(primaryStatIndexes.Length);
+        targetIdx = primaryStatIndexes[randomRefineIndex];
+        selectedRefinedStat = returnRefinedSoldierStats[targetIdx];
 
-		archetypeConfig = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_Utils'
-		.static.ATNCE_GetConfigForStatType(selectedPrimaryStat.CharStatType);
+        if(currentHighTierStatsCount >= soldierDetail.MaxHighTierStatsAllowed) 
+        {
+            selectedTier = ATNCE_TierC;
+        }
+        else
+        {
+            selectedTier = ATNCE_TierB;
+            currentHighTierStatsCount++;
+        }
 
-		if(soldierDetail.HighTierStatsCount == soldierDetail.MaxHighTierStatsAllowed) 
-		{
-			selectedTier = ATNCE_TierC;
-		}
-		else
-		{
-			selectTierRanges.minSelectTier = ATNCE_TierC;
-			if(selectedPrimaryStat.CharStatType != eStat_Mobility && countAllLowTiers == soldierDetail.soldierStats.Length)
-			{
-				selectTierRanges.minSelectTier = ATNCE_TierB;
-			}
-			
-			selectedTier = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_TierResolver'
-			.static.ATNCE_SelectTierByWeighting(archetypeConfig, selectTierRanges, soldierDetail);
-		}
+        refinedStatValue = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_TierResolver'
+            .static.ATNCE_ResolveStatValueByTierWeight(
+                selectedRefinedStat.tierRanges, 
+                selectedTier, 
+                enableLogging);
 
-		refinedStatValue = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_TierResolver'
-			.static.ATNCE_ResolveStatValueByTierWeight(
-			archetypeConfig,
-			selectedPrimaryStat.tierRanges, 
-			selectedTier, 
-			enableLogging);
+        selectedRefinedStat.StatValue = refinedStatValue;
+        selectedRefinedStat.StatMessage = "Refined to" @ selectedTier;
+        selectedRefinedStat.Tier = selectedTier;
+        selectedRefinedStat.isStatRefined = true;
+        
+        returnRefinedSoldierStats[targetIdx] = selectedRefinedStat;
+    }
 
-		selectedPrimaryStat.StatValue = refinedStatValue;
-		selectedPrimaryStat.StatMessage = "Refined" @ selectedPrimaryStat.Tier;
-		selectedPrimaryStat.Tier = selectedTier;
-		selectedPrimaryStat.isStatRefined = true;
-		returnRefinedSoldierStats[primaryStatIndexes[randomPrimaryIndex]] = selectedPrimaryStat;
-	}
+    // Non-Primary
+    if(soldierDetail.SelectedArchetypeIndex < 0 && currentHighTierStatsCount < 2 && nonPrimaryStatIndexes.Length > 0) 
+    {
+        randomRefineIndex = `SYNC_RAND_STATIC(nonPrimaryStatIndexes.Length);
+        targetIdx = nonPrimaryStatIndexes[randomRefineIndex];
+        
+        selectedRefinedStat = returnRefinedSoldierStats[targetIdx];
 
-	return returnRefinedSoldierStats;
+        statConfig = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_Utils'
+            .static.ATNCE_GetConfigForStatType(selectedRefinedStat.CharStatType);
+
+        selectTierRanges.minSelectTier = ATNCE_TierC;
+		selectTierRanges.maxSelectTier = ATNCE_TierB;
+
+        selectedTier = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_TierResolver'
+            .static.ATNCE_SelectTierByWeighting(statConfig, selectTierRanges, soldierDetail);
+
+        refinedStatValue = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_TierResolver'
+            .static.ATNCE_ResolveStatValueByTierWeight(
+                selectedRefinedStat.tierRanges, 
+                selectedTier, 
+                enableLogging);
+        
+        selectedRefinedStat.StatValue = refinedStatValue;
+        selectedRefinedStat.StatMessage = "Refined" @ selectedRefinedStat.Tier;
+        selectedRefinedStat.Tier = selectedTier;
+        selectedRefinedStat.isStatRefined = true;
+        
+        returnRefinedSoldierStats[targetIdx] = selectedRefinedStat;
+
+        currentHighTierStatsCount++;
+    }
+
+    return returnRefinedSoldierStats;
 }
 
 /// Function: SyncCombatIntelligence
@@ -657,12 +682,12 @@ static function SyncCombatIntelligence(XComGameState_Unit unit)
 
 static function int ATNCE_GetRangeValue(ECharStatType statType, ATNCE_StatRangeType rangeType, int defaultStatValue)
 {
-	local ATNCE_StatConfig config;
+	local ATNCE_StatConfig statConfig;
 	local int returnStatValue;
 
-	config = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_Utils'.static.ATNCE_GetConfigForStatType(statType);
+	statConfig = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_Utils'.static.ATNCE_GetConfigForStatType(statType);
 
-	if (config.CharStatType == eStat_Invalid)
+	if (statConfig.CharStatType == eStat_Invalid)
 	{
 		return defaultStatValue;
 	}
@@ -670,13 +695,13 @@ static function int ATNCE_GetRangeValue(ECharStatType statType, ATNCE_StatRangeT
 	switch (rangeType)
 	{
 		case ATNCE_RangeLow:
-			returnStatValue = config.StatRanges.RangeLow;
+			returnStatValue = statConfig.StatRanges.RangeLow;
 			break;
 		case ATNCE_RangeMid:
-			returnStatValue = config.StatRanges.RangeMid;
+			returnStatValue = statConfig.StatRanges.RangeMid;
 			break;
 		case ATNCE_RangeHigh:
-			returnStatValue = config.StatRanges.RangeHigh;
+			returnStatValue = statConfig.StatRanges.RangeHigh;
 			break;
 	}
 
