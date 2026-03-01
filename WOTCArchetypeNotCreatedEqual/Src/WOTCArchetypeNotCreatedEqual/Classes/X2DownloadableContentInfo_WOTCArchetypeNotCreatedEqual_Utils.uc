@@ -18,7 +18,6 @@ static function ATNCE_TestGenerateSoldierStats()
 	local int i;
 	local int j;
 	local ATNCE_SoldierDetail soldierDetails;
-	local int selectedArchetypeIndex;
 
 	numberOfSoldiers = default.ATNCE_TestSolderGenerationCount;
 
@@ -26,16 +25,12 @@ static function ATNCE_TestGenerateSoldierStats()
 	{
 		return;
 	}
-
-	class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual'.static.ATNCE_GenerateSoldier(-1, true);
 	
 	for (i = 0; i < numberOfSoldiers; ++i)
 	{	
 		`LOG("[SOLDIER_" @ i @ "]", true, 'WOTCArchetype_ATNCE');
-
-		selectedArchetypeIndex = ATNCE_RandomArchetypeSoldier();
 		
-		soldierDetails = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual'.static.ATNCE_GenerateSoldier(selectedArchetypeIndex, true);
+		soldierDetails = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual'.static.ATNCE_GenerateSoldier(true);
 		`LOG("[SOLDIER_" @ i @ "] Initial Stats: " @ soldierDetails.SoldierStats.Length, true, 'WOTCArchetype_ATNCE');
 
 		soldierDetails.SoldierStats = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual'.static.ATNCE_RefineSoldierStats(soldierDetails, true);

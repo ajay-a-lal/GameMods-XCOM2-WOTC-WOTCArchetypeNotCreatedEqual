@@ -230,33 +230,31 @@ static function ATNCE_TierRanges ATNCE_GenerateTierRangesByArchetype(const ATNCE
 }
 
 /// Function: ATNCE_CalculateMaxHighTierStatsAllowed
-/// Purpose: Calculates the maximum number of high-tier (A and B) stats allowed for a soldier.
-/// Based on the number of available archetypes, with a random variance to create diversity.
-/// Returns: The maximum count of high-tier stats this soldier can have
-// Examples
-/*
-    - <= 7 Stats 2-3
-    - 
- */
+/// Purpose: Calculates the high-tier stat cap using fixed percentages.
+/// Guarantees a "Hero" floor of at least 2 to 4 high-tier stats, while
+/// Returns: An integer representing the randomized high-tier stat cap.
 static function int ATNCE_CalculateMaxHighTierStatsAllowed()
 {
     local int arrayLen;
-    local int minCeiling;
-    local int maxCeiling;
-    local int randomOffset;
+    local int minResult;
+    local int maxResult;
+    local int randomRange;
     local ATNCE_CoreConfig coreConfig;
 
     coreConfig = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual'.static.ATNCE_GetCoreConfig();
-
     arrayLen = coreConfig.ATNCE_StatTierWeights.Length;
+    minResult = 2;
+    maxResult = 3;
 
-    if(arrayLen < 7) return 2;
+    if(arrayLen < 7) return minResult;
 
-    minCeiling = Max(2, arrayLen / 3); 
-    maxCeiling = Max(3, (arrayLen / 2));
-
-    randomOffset = `SYNC_RAND_STATIC(maxCeiling - minCeiling + 1);
-
-    return minCeiling + randomOffset;
+    if(arrayLen >= 10)
+    {
+        minResult = 3;
+        maxResult = 4;
+    }
+    
+    randomRange = (maxResult - minResult) + 1;
+    return minResult + `SYNC_RAND_STATIC(randomRange);
 }
 

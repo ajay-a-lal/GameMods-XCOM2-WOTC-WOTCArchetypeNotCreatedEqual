@@ -315,7 +315,6 @@ function ATNCE_OnStatAssignmentCompleteFn(XComGameState_Unit unit)
 	local ATNCE_SoldierDetail soldierDetail;
 	local int i;
 	local bool isAtnceSecondWaveEnabled;
-	local int selectedArchetypeIndex;
 
 	isAtnceSecondWaveEnabled = `SecondWaveEnabled('ATNCE');
 
@@ -339,9 +338,7 @@ function ATNCE_OnStatAssignmentCompleteFn(XComGameState_Unit unit)
 
 	`LOG("Generate Soldier Stats: " @ unit.GetMyTemplateName() @ " (" @ unit.ObjectID @ ")", default.ATNCE_EnableLogging, 'WOTCArchetype_ATNCE');
 
-	selectedArchetypeIndex = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_Utils'.static.ATNCE_RandomArchetypeSoldier();
-
-	soldierDetail = ATNCE_GenerateSoldier(selectedArchetypeIndex, false);
+	soldierDetail = ATNCE_GenerateSoldier(false);
 
 	if (soldierDetail.SoldierStats.Length == 0)
 	{
@@ -380,12 +377,12 @@ function ATNCE_OnStatAssignmentCompleteFn(XComGameState_Unit unit)
 /// Optionally assigns archetype bonuses if selectedArchetypeIndex >= 0.
 /// Orders stat processing to apply archetype primary/secondary stats first.
 /// Params:
-///   selectedArchetypeIndex - Index of archetype (-1 for no archetype)
 ///   enableLogging - Whether to enable debug logging
 /// Returns: Array of ATNCE_SoldierStat containing generated stats for all configured stat types
-static function ATNCE_SoldierDetail ATNCE_GenerateSoldier(int selectedArchetypeIndex, bool enableLogging)
+static function ATNCE_SoldierDetail ATNCE_GenerateSoldier(bool enableLogging)
 {
 	local ATNCE_StatConfig config;
+	local int selectedArchetypeIndex;
 	local int i;
 	local ATNCE_TierRanges tierRanges;
 	local ATNCE_TierType selectedTier;
@@ -402,6 +399,8 @@ static function ATNCE_SoldierDetail ATNCE_GenerateSoldier(int selectedArchetypeI
 		`LOG("[INFO] No Archetypes defined, exiting", true, 'WOTCArchetype_ATNCE');
 		return soldierDetail;
 	}
+
+	selectedArchetypeIndex = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_Utils'.static.ATNCE_RandomArchetypeSoldier();
 
 	soldierDetail.SelectedArchetypeIndex = selectedArchetypeIndex;
 	if(selectedArchetypeIndex >= 0)
@@ -531,6 +530,7 @@ static function array<ATNCE_SoldierStat> ATNCE_RefineSoldierStats(ATNCE_SoldierD
 		if (soldierDetail.soldierStats[i].StatGroupType == ATNCE_Primary)
 		{
 			numberOfPrimaryStats++;
+			
 			primaryStatIndexes.AddItem(i);
 			if (soldierDetail.soldierStats[i].Tier == ATNCE_TierD)
 			{
@@ -538,7 +538,7 @@ static function array<ATNCE_SoldierStat> ATNCE_RefineSoldierStats(ATNCE_SoldierD
 			}
 		}
 
-		if (soldierDetail.soldierStats[i].Tier == ATNCE_TierD || soldierDetail.soldierStats[i].Tier == ATNCE_TierC)
+		if (soldierDetail.soldierStats[i].Tier == ATNCE_TierD)
 		{
 			countAllLowTiers++;
 		}
@@ -554,12 +554,18 @@ static function array<ATNCE_SoldierStat> ATNCE_RefineSoldierStats(ATNCE_SoldierD
 		archetypeConfig = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_Utils'
 		.static.ATNCE_GetConfigForStatType(selectedPrimaryStat.CharStatType);
 
-		if(soldierDetail.SelectedArchetypeIndex >= 0 && soldierDetail.HighTierStatsCount == soldierDetail.MaxHighTierStatsAllowed) {
+		if(soldierDetail.HighTierStatsCount == soldierDetail.MaxHighTierStatsAllowed) 
+		{
 			selectedTier = ATNCE_TierC;
 		}
 		else
 		{
-			selectTierRanges.minSelectTier = countAllLowTiers == soldierDetail.soldierStats.Length ? ATNCE_TierB : ATNCE_TierC;
+			selectTierRanges.minSelectTier = ATNCE_TierC;
+			if(selectedPrimaryStat.CharStatType != eStat_Mobility && countAllLowTiers == soldierDetail.soldierStats.Length)
+			{
+				selectTierRanges.minSelectTier = ATNCE_TierB;
+			}
+			
 			selectedTier = class'X2DownloadableContentInfo_WOTCArchetypeNotCreatedEqual_TierResolver'
 			.static.ATNCE_SelectTierByWeighting(archetypeConfig, selectTierRanges, soldierDetail);
 		}
@@ -600,11 +606,11 @@ static function array<ATNCE_SoldierStat> ATNCE_RefineSoldierStats(ATNCE_SoldierD
 	Approximate Distribution (with this independent Aim+Psi max logic, using mod config tier weights):
     Level     | Value | Approx % of Recruits 
     ----------|-------|----------------------
-    Very Low  |   0   |          ~6%         
-    Low       |   1   |         ~21%         
-    Average   |   2   |         ~47%         
+    Very Low  |   0   |          ~3%         
+    Low       |   1   |         ~11%         
+    Average   |   2   |         ~55%         
     High      |   3   |         ~21%         
-    Very High |   4   |          ~5%         
+    Very High |   4   |          ~10%         
 */
 static function SyncCombatIntelligence(XComGameState_Unit unit)
 {
