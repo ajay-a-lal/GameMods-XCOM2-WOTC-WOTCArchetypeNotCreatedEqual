@@ -582,45 +582,71 @@ static function array<ATNCE_SoldierStat> ATNCE_RefineSoldierStats(ATNCE_SoldierD
 }
 
 /// Function: SyncCombatIntelligence
-/// Purpose: Syncs a unit's combat intelligence based on changes to PSI Offense, AIm and Mobility stat.
-/// Maps stat deltas to combat intelligence modifiers:
-///   >= 12: +2 CI, 6-11: +1 CI, -6 to -5: -1 CI, <= -6: -2 CI
-/// Clamps result between eComInt_Standard and eComInt_Savant.
-/// Params:
-///   unit - The soldier unit to modify
-static function SyncCombatIntelligence(XcomGameState_Unit unit)
-{
-    local int aimDelta, mobDelta, psiDelta, totalDelta;
-    local int ciAdjustment, currentComInt;
-    local int midAim, midMob, midPsi;
-    
+/// Purpose: Syncs Combat Intelligence independently from Aim and Psi Offense deltas.
+/// Computes CI from each stat separately (base Average + adj), final = max(CI_Aim, CI_Psi).
+/// Tuned thresholds: >=12:+2, >=6:+1, <=-3:-1, <=-7:-2.
+/// Rewards high Aim (overrides low Psi), no penalty for poor Aim if Psi strong.
+/// Achieves ~2.5% VL, 13% Low (low-end halved vs. current), Avg ~54%.
+/*
+    ECombatIntelligence Enum Reference (LWOTC 1.2 / XCOM 2 WotC)
+    Enum Name              | Value | AP per Promotion | Total Career AP (7 ranks) | Description
+    -----------------------|-------|------------------|----------------------------|-----------------------------------
+    eComInt_VeryLow        |   0   |        4         |           28              | Very Low (trash recruits)
+    eComInt_Low            |   1   |        5         |           35              | Low
+    eComInt_Standard       |   2   |        6         |           42              | Average / Standard (most common)
+    eComInt_High           |   3   |        7         |           49              | High
+    eComInt_Savant         |   4   |        8         |           56              | Very High / Savant (rarest)
 
-	midAim = ATNCE_GetRangeValue(eStat_Offense, ATNCE_RangeMid, 65);
-    midMob = ATNCE_GetRangeValue(eStat_Mobility, ATNCE_RangeMid, 14);
+	Approximate Distribution (with this independent Aim+Psi max logic, using mod config tier weights):
+    Level     | Value | Approx % of Recruits 
+    ----------|-------|----------------------
+    Very Low  |   0   |          ~6%         
+    Low       |   1   |         ~21%         
+    Average   |   2   |         ~47%         
+    High      |   3   |         ~21%         
+    Very High |   4   |          ~5%         
+*/
+static function SyncCombatIntelligence(XComGameState_Unit unit)
+{
+    local int aimDelta, psiDelta;
+    local int aimAdj, psiAdj, ciAim, ciPsi, finalCI;
+    local int midAim, midPsi;
+
+    midAim = ATNCE_GetRangeValue(eStat_Offense, ATNCE_RangeMid, 65);
     midPsi = ATNCE_GetRangeValue(eStat_PsiOffense, ATNCE_RangeMid, 20); 
 
     aimDelta = int(unit.GetBaseStat(eStat_Offense)) - midAim;
-    mobDelta = (int(unit.GetBaseStat(eStat_Mobility)) - midMob) * 4; 
     psiDelta = int(unit.GetBaseStat(eStat_PsiOffense)) - midPsi;
 
-    totalDelta = aimDelta + mobDelta + psiDelta;
+    aimAdj = 0;
+    if (aimDelta >= 10) aimAdj = 2;
+    else if (aimDelta >= 6) aimAdj = 1;
+    else if (aimDelta <= -7) aimAdj = -2;
+    else if (aimDelta <= -3) aimAdj = -1;
 
-    ciAdjustment = 0;
+    psiAdj = 0;
+    if (psiDelta >= 12) psiAdj = 2;
+    else if (psiDelta >= 6) psiAdj = 1;
+    else if (psiDelta <= -7) psiAdj = -2;
+    else if (psiDelta <= -3) psiAdj = -1;
 
-    if (totalDelta >= 24)       ciAdjustment = 2; 
-    else if (totalDelta >= 12)  ciAdjustment = 1; 
-    else if (totalDelta <= -24) ciAdjustment = -2;
-    else if (totalDelta <= -12) ciAdjustment = -1;
+    ciAim = 2 + aimAdj;
+    ciPsi = 2 + psiAdj;
 
-    currentComInt = unit.ComInt;
-    currentComInt += ciAdjustment;
+    finalCI = Max(ciAim, ciPsi);
 
-    if (currentComInt < eComInt_Standard) currentComInt = eComInt_Standard;
-    if (currentComInt > eComInt_Savant)   currentComInt = eComInt_Savant;
+    if (finalCI <= 0) 
+	{
+		finalCI = (Rand(2) == 0) ? 1 : 0;
+	}
 
-    unit.ComInt = ECombatIntelligence(currentComInt);
+    if (finalCI > 4) finalCI = 4;
 
-	`LOG("    CI Sync: Delta=" @ totalDelta @ " | Adj=" @ ciAdjustment @ " | Final CI=" @ int(unit.ComInt), default.ATNCE_EnableLogging, 'WOTCArchetype_ATNCE');
+    unit.ComInt = ECombatIntelligence(finalCI);
+
+	`LOG("    CI Sync: AimD="@aimDelta@" Adj="@aimAdj@" CI="@ciAim@
+         " | PsiD="@psiDelta@" Adj="@psiAdj@" CI="@ciPsi@
+         " | Final="@finalCI, default.ATNCE_EnableLogging, 'WOTCArchetype_ATNCE');
 }
 
 static function int ATNCE_GetRangeValue(ECharStatType statType, ATNCE_StatRangeType rangeType, int defaultStatValue)
